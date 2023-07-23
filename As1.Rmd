@@ -1,0 +1,211 @@
+---
+title: "As1"
+output: html_document
+date: "2023-07-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+```{r}
+
+# Install the required packages 
+install.packages("tidyverse")
+install.packages("lubridate")
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+ BiocManager::install("impute", version = "3.17")
+
+
+
+# Load the packages
+library(tidyverse)
+library(lubridate)
+
+
+#Loading datasets into R
+library(readxl)
+WorldwideVaccineData <- read_excel("~/Library/Mobile Documents/com~apple~Numbers/Documents/WorldwideVaccineData.xlsx")
+library(readxl)
+CountryLockdowndates <- read_excel("~/Downloads/CountryLockdowndates.xls")
+
+library(readxl)
+Covid_data <- read_excel("~/Library/Mobile Documents/com~apple~Numbers/Documents/Covid-data.xlsx")
+View(Covid_data)
+
+
+```
+
+
+Exploring the datasets
+
+```{r}
+head(Covid_data)
+summary(Covid_data)
+str(Covid_data)
+nrow(Covid_data)
+
+head(WorldwideVaccineData)
+summary(WorldwideVaccineData)
+str(WorldwideVaccineData)
+nrow(WorldwideVaccineData)
+
+head(CountryLockdowndates)
+summary(CountryLockdowndates)
+str(CountryLockdowndates)
+nrow(CountryLockdowndates)
+
+
+```
+Finding missing values in the three datasets
+
+```{r}
+install.packages("naniar")
+install.packages("simputation")
+library(naniar)
+library(simputation)
+
+missing_values <- sapply(WorldwideVaccineData, function(x) sum(is.na(x)))
+print(missing_values)# No missing values found
+
+missing_values_country <- sapply(CountryLockdowndates, function(x) sum(is.na(x)))
+print(missing_values_country)
+
+missing_values_covid <- sapply(Covid_data, function(x) sum(is.na(x)))
+print(missing_values_covid)
+
+```
+
+
+Handling the missing datasets - 
+CountryLockdownDates datasset has missing values in the "Province" column. I have decided to keep the missing values as they are because they may indicate that information about the province or territory is not available. The filter() function from the dplyr package is used to remove rows where the "Date" column has NA values. The !is.na(Date) part inside the filter() function checks for non-missing values in the "Date" column. Rows that meet this condition will be kept, and rows with missing dates will be removed.
+
+
+```{r}
+
+#Handling missing data in countrylockdowndates dataframe
+
+sum(is.na(CountryLockdowndates$Date))
+
+# Remove rows with missing dates in the "Date" column
+CountryLockdowndates <- CountryLockdowndates %>%
+  filter(!is.na(Date))
+
+
+# Handling missing data in the Covid_data dataframe
+
+# Sort the dataset based on 'date' (if not already sorted)
+Covid_data <- Covid_data[order(Covid_data$total_cases), ]
+
+# Identify missing values in 'new_deaths' and 'total_deaths'
+missing_new_deaths <- which(is.na(Covid_data$new_deaths))
+missing_total_deaths <- which(is.na(Covid_data$total_deaths))
+
+# Handling missing data using median
+
+Covid_data <- Covid_data %>% 
+  mutate(new_deaths  = if_else(is.na(new_deaths), median(new_deaths, na.rm = TRUE), new_deaths),
+         total_deaths = if_else(is.na(total_deaths), median(total_deaths, na.rm = TRUE), total_deaths))
+
+
+
+
+
+```{r}
+#The "Date" column is currently in character format. We can convert it to the date format using the as.Date() function in R. Convert the "Date" column to a proper date format for two datasets containing Date
+
+CountryLockdowndates$Date <- as.Date(CountryLockdowndates$Date, format = "%Y/%m/%d")
+Covid_data$date <- as.Date(Covid_data$date, format = "%Y-%m-%d")
+
+
+
+#For CountryLockdowndates dataset we can remove the reference column as it is not needed for the analysis.
+
+CountryLockdowndates$Reference <- NULL
+CountryLockdowndates$Type <- NULL
+
+
+#Saving this new cleaned dataset to new file
+
+write.csv(CountryLockdowndates, "CountryLockdowndates_cleaned.csv", row.names = FALSE)
+```
+
+Standardising the location for Italy, Iran, United Kingdom and United States 
+
+```{r}
+# Load the required libraries
+library(dplyr)
+
+# Correct misspelled country names
+Covid_data$location <- ifelse(tolower(Covid_data$location) == "iran", "Iran", Covid_data$location)
+Covid_data$location <- ifelse(tolower(Covid_data$location) == "itly", "Italy", Covid_data$location)
+Covid_data$location <- gsub("UnitedKingdom", "United Kingdom", Covid_data$location)
+Covid_data$location <- gsub("United Stats", "United States", Covid_data$location)
+
+
+# Group the data by 'Country/Region' in CountryLockdowndates dataset
+filtered_data <- CountryLockdowndates[order(CountryLockdowndates$Date), ] %>%
+  group_by(`Country/Region`) %>%
+  summarise(Smallest_Date = min(Date),
+            Province = first(Province))
+
+# Print the result
+print(filtered_data)
+
+
+#Standardising titles for the three datasets
+
+CountryLockdowndates <- CountryLockdowndates %>%
+  rename(Country = `Country/Region`)
+
+Covid_data <- Covid_data %>%
+  rename(Country = `location`)
+filtered_data <- filtered_data %>%
+  rename(Date = `Smallest_Date`)
+
+filtered_data <- filtered_data %>%
+  rename(Country = `Country/Region`)
+
+#Capitalise date in Covid_data dataset
+colnames(Covid_data)[colnames(Covid_data) == "date"] <- "Date"
+
+
+```
+
+Joining datasets
+
+```{r}
+# Join covid_data with vaccination_data based on "Country" and "Date"
+merged_data <- left_join(Covid_data, filtered_data, by = c("Country", "Date"))
+
+# Join merged_data with population_data based on "Country" and "Date"
+final_data <- left_join(merged_data, WorldwideVaccineData, by = c("Country"))
+
+
+```
+
