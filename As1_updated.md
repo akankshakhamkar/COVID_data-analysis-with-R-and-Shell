@@ -1,5 +1,5 @@
 ---
-title: "As1"
+##title: "As1"
 output:
   word_document: default
   pdf_document: default
@@ -238,7 +238,7 @@ final_data1 <- final_data23 %>%
 
 ```
 
-Creating plots for each country 
+##Creating plots for each country 
 
 
 ```{r}
@@ -490,8 +490,7 @@ The findings suggest that there is a relationship between a country's GDP and it
 
 It is essential to consider that the relationship between GDP and COVID-19 outcomes is not solely deterministic, as other factors can also play significant roles. For example, government policies, public adherence to preventive measures, population density, and the timing of interventions can all influence the progression of the pandemic. It is important to remember that each country's situation is unique, and multiple factors contribute to the final outcomes.
 
-PART 3:
-To explore the relationships among newly infected cases, newly deaths, total doses administered, and % of population fully vaccinated.
+##PART 3: To explore the relationships among newly infected cases, newly deaths, total doses administered, and % of population fully vaccinated.
 
 
 ```{r}
