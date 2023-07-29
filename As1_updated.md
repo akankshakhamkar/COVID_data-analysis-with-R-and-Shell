@@ -1,5 +1,5 @@
 ---
-##title: "As1"
+# title: "As1"
 output:
   word_document: default
   pdf_document: default
@@ -238,7 +238,7 @@ final_data1 <- final_data23 %>%
 
 ```
 
-##Creating plots for each country 
+# Creating plots for each country 
 
 
 ```{r}
@@ -519,13 +519,98 @@ Features that were least influential shown by the weak correlation was new cases
 Overall,correlation matrix helps us identify potential associations between variables, it does not indicate causative relationships. Further research and analysis are necessary to understand the underlying factors driving these correlations.
 
 
-PART 4: 
+# PART 4: 
 
 ```{r}
 
+install.packages("caret")
+library(caret)
+library(lubridate)  # For date manipulation
 
+
+France_data <- final_data1 %>% filter(location == "France")
+regression.1 <- lm (formula = new_deaths ~ Date, data = France_data )
+print(regression.1)
+
+# Plot the trend of newly death cases in France
+ggplot(France_data, aes(x = Date, y = new_deaths)) +
+  geom_line(color = "blue") +
+  labs(title = "Trend of New Death Cases in France",
+       x = "Date",
+       y = "Newly Infected Cases") +
+  theme_minimal()
+
+# Fit a polynomial regression line to the data
+
+poly_model_France <- lm(new_deaths ~ poly(as.numeric(Date), degree = 5), data = France_data)
+print(poly_model_France)
+
+# Generate dates for the next five to seven days
+next_dates_France <- seq(max(France_data$Date) + 1, length.out = 7, by = "days")
+
+# Make predictions using the polynomial regression model
+predictions_France <- predict(poly_model_France, newdata = data.frame(Date = next_dates_France))
+
+# Create a data frame to store the predictions
+prediction_data_France <- data.frame(Date = next_dates_France, Predicted_New_Cases = predictions_France)
+
+
+# Split the data into training and test set
+set.seed(123)
+training.samples <- sample(1: nrow(France_data), 0.9*nrow(France_data))
+train_data <- France_data[training.samples, ]
+test_data <- France_data[-training.samples, ]
+
+# Fit the polynomial regression model
+poly_model_train <- lm(new_deaths ~ poly(Date, degree = 8), data = train_data)
+
+
+# Predict new_deaths for the next days using the trained model
+predictions <- poly_model_train %>% predict(test_data)
+
+# Print the predictions
+print(predictions)
+
+# Get the actual values from the testing data
+
+actual_values <- test_data$new_deaths
+print(actual_values)
+
+
+data.frame(RMSE = RMSE(predictions, actual_values),
+           R2 = R2(predictions, actual_values))
+
+
+# Define the control parameters for K-fold Cross-Validation
+ctrl <- trainControl(method = "cv", number = 12)  # 12-fold CV 
+
+# Fit the polynomial regression model using K-fold CV
+poly_model_cv <- train(new_deaths ~ poly(Date, degree = 10), data = France_data, method = "lm", trControl = ctrl)
+
+# Print the results of K-fold CV
+print(poly_model_cv)
 
 ```
+
+Based on the results that was obtained from the polynomial regression model which had a degree 10 using K-fold Cross-Validation on the France dataset. The R^2 value was 0.808806 which tells us that the model could explain around 80% of variance in the new death cases (relatively high). The RMSE and MAE values were relatively low, which tells us that the model's predictions are close to the actual values.
+
+However, it is important to consider possible overfitting phenomena occuring. Overfitting happens when the model performs well on the training data but does not generalize well to new, unseen data. A high-degree polynomial regression model with a degree 10 in my model could be prone to overfitting, capturing noise in the data rather than the true underlying pattern which means that the model may perform poorly on new data. Based on the R-squared value and RMSE, the model seems to be performing well on the dataset, suggesting it is not underfitting. However, there is a possibility that the high-degree polynomial (degree 10) is leading to overfitting, capturing noise in the data.
+
+The use of K-fold Cross-Validation helps in reducing the overfitting issue by providing a more robust estimate of the model's performance. It helps to assess how the model generalizes to different subsets of the data, mitigating the potential impact of overfitting on the model's evaluation.
+
+To enhance the model's performance and reduce potential overfitting, some strategies can be considered:
+
+1. Feature Selection: It may be beneficial to explore feature selection techniques to identify the most relevant and informative features for predicting new death cases. Removing irrelevant or redundant features can help in reducing model complexity and improve generalization.
+
+2. Regularization: Instead of using a high-degree polynomial, applying regularization techniques like Ridge or Lasso regression can help control the model's complexity and prevent overfitting.
+
+3. More Data: Collecting more data, if possible, can help in improving the model's generalizability and performance.
+
+4. Feature Engineering: Creating additional relevant features or aggregating data at different temporal levels might improve the model's ability to capture meaningful patterns.
+
+In conclusion, while the polynomial regression model with degree 12 shows promising results in predicting new death cases in France, there is a possibility of overfitting due to the high model complexity. K-fold Cross-Validation helps in assessing the model's generalization performance. To further enhance the model's performance, feature selection and regularization techniques, along with more data, can be explored.
+
+
 
 
 
